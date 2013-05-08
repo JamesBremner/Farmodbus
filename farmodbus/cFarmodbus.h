@@ -43,7 +43,8 @@ namespace raven {
 		port_not_open,
 		timed_out,
 		bad_register_address,
-		not_ready,
+		not_ready,					///< polling has not yet been completed
+		not_singleton,				///< the application must only create ONE cFarmodbus
 	};
 
 
@@ -237,10 +238,12 @@ public:
 
 
 private:
+	static int myLastID;
 	std::vector< cPort > myPort;
 	std::vector< cStation * > myStation;
 
 	void Poll();
+	bool IsSingleton() { return myLastID == 1; }
 };
 	}
 }

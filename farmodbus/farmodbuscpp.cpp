@@ -72,9 +72,9 @@ int _tmain(int argc, _TCHAR* argv[])
 	theCOM.Open( "COM4" );
 
 	// Do 10 reads at 1 Hz
+	unsigned short value;
 	for( int k = 0; k < 10; k++ ) {
 		// read register #5
-		unsigned short value;
 		error = theModbusFarm.Query( value, station, 1 );
 		if( error != raven::farmodbus::OK ) {
 			printf("Modbus read error #%d\n", error );
@@ -100,6 +100,13 @@ int _tmain(int argc, _TCHAR* argv[])
 		}
 		Sleep(1000);
 	}
+
+	raven::farmodbus::cFarmodbus ModbusFarm2;
+	if( ModbusFarm2.Query( value, 1, 1 ) != raven::farmodbus::not_singleton ) {
+		printf("ERROR: Failed to enforce singleton\n");
+		return 1;
+	}
+
 	return 0;
 }
 

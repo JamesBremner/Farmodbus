@@ -31,6 +31,7 @@ namespace raven {
 		// so no duplicates are created
 		int cPort::myLastID = 0;
 		int cStation::myLastHandle = 0;
+		int cFarmodbus::myLastID = 0;
 
 		cPort::cPort( cSerial& serial )
 		{
@@ -132,6 +133,7 @@ namespace raven {
 			for( int k = 0; k < myCount; k++ ) {
 				*value++ = myValue[myFirstReg+k];
 			}
+			return OK;
 		}
 
 		void cStation::Poll()
@@ -200,6 +202,11 @@ namespace raven {
 
 		cFarmodbus::cFarmodbus(void)
 		{
+			// ensure thast the app only creates one of these
+			myLastID++;
+			if( ! IsSingleton() )
+				return;
+
 			// start polling thread
 			boost::thread* pThread = new boost::thread(
 				boost::bind(
@@ -265,6 +272,8 @@ error cFarmodbus::Query(
 		int reg )
 { 
 	// firewall
+	if( ! IsSingleton() )
+		return not_singleton;
 	if( 0 > station || station >= (int) myStation.size() )
 		return bad_station_handle;
 	if( 0 > reg || reg > 255 )
@@ -280,6 +289,8 @@ error cFarmodbus::Query(
 	int reg_count )
 {
 		// firewall
+	if( ! IsSingleton() )
+		return not_singleton;
 	if( 0 > station || station >= (int) myStation.size() )
 		return bad_station_handle;
 	if( 0 > first_reg || first_reg > 255 )
