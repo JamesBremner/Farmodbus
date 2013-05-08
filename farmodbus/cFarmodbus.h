@@ -30,6 +30,23 @@ namespace raven {
 	typedef int port_handle_t;
 	typedef int station_handle_t;
 
+	/**
+
+	Error return values
+
+	*/
+	enum error {
+		OK,
+		NYI,
+		bad_port_handle,
+		bad_station_handle,
+		port_not_open,
+		timed_out,
+		bad_register_address,
+		not_ready,
+	};
+
+
 	// port details
 class cPort {
 
@@ -50,14 +67,32 @@ class cStation {
 	int myHandle;
 	static int myLastHandle;
 	int myAddress;
-	port_handle_t myPort;
+	int myFirstReg;
+	int myCount;
+	
+	error myError;
 
 public:
-	cStation( int address, port_handle_t port );
+	cStation( int address, raven::cSerial * serial );
+
+	error Query( 
+		unsigned short& value,
+		int reg );
+
+	void Poll();
 
 	int getHandle() { return myHandle; }
 	int getAddress() { return myAddress; }
-	port_handle_t getPort() { return myPort; }
+
+private:
+	raven::cSerial * mySerial;
+	unsigned short myValue[255];
+	boost::mutex myMutex;
+
+	unsigned short CyclicalRedundancyCheck(
+		unsigned char * msg, int len );
+
+
 };
 
 /**
@@ -70,20 +105,16 @@ public:
 class cFarmodbus
 {
 public:
+
 	/**
 
-	Error return values
+	Construct modbus farm
+
+	The constructor starts polling.  Until you add some stations
+	the polling does nothing, bit is always going on and will do more and more work
+	as stations are added.
 
 	*/
-	enum error {
-		OK,
-		NYI,
-		bad_port_handle,
-		bad_station_handle,
-		port_not_open,
-		timed_out,
-		bad_register_address,
-	};
 
 	cFarmodbus(void);
 
@@ -97,6 +128,10 @@ public:
 	@return error
 
 	TODO: Add TCP port ( socket )
+
+	Once a port is added to the modbus farm with some stations
+	then polling will start and continue on the port.  NOTHING ELSE
+	SHOULD access the port once this begins.
 
 	*/
 	error Add( port_handle_t& handle, cSerial& port );
@@ -126,6 +161,14 @@ public:
 	@param[in] reg register offset to read
 
 	@return error
+
+	The first time that you read a particular register
+	the value will not yet have been polled so this will
+	return not_ready.
+	The register will have been added to the polling list
+	and once it has been polled at least once successfully
+	this will then work.
+
 	*/
 	error Query( 
 		unsigned short& value,
@@ -184,10 +227,9 @@ public:
 
 private:
 	std::vector< cPort > myPort;
-	std::vector< cStation > myStation;
+	std::vector< cStation * > myStation;
 
-	unsigned short CyclicalRedundancyCheck(
-		unsigned char * msg, int len );
+	void Poll();
 };
 	}
 }

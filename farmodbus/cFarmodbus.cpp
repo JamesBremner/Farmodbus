@@ -39,24 +39,149 @@ namespace raven {
 		}
 		cStation::cStation( 
 			int address,
-			port_handle_t port )
+			raven::cSerial * serial )
+			: myAddress( address )
+			, mySerial( serial )
+			, myFirstReg( -1 )
+			, myError( not_ready )
 		{
 			myHandle  = myLastHandle++;
-			myAddress = address;
-			myPort    = port;
 		}
-cFarmodbus::cFarmodbus(void)
-{
-}
+		error cStation::Query( 
+			unsigned short& value,
+			int reg )
+		{
 
-cFarmodbus::error cFarmodbus::Add( port_handle_t& handle, ::raven::cSerial& port )
-{ 
-	myPort.push_back( cPort( port ) );
-	handle = (port_handle_t) myPort.size() - 1;
-	return OK;
-}
+			if( 0 > reg || reg > 255 )
+				return bad_register_address;
 
-cFarmodbus::error 
+			// check if we need to extend the registered polled
+			if( myFirstReg == -1 ) {
+				//first time called
+				myFirstReg = reg;
+				myCount = 1;
+				myError = not_ready;
+			} else {
+				if( reg < myFirstReg ) {
+					myFirstReg = reg;
+					myError = not_ready;
+				} else if ( reg - myFirstReg + 1 > myCount ) {
+					myCount = reg - myFirstReg + 1;
+					myError = not_ready;
+				}
+				
+			}
+
+			// prevent other threads from accessing the cached values
+			boost::mutex::scoped_lock lock( myMutex );
+
+			// check if we have a good value from last poll
+			if( myError != OK )
+				return myError;
+
+			// value saved from last poll
+			value = myValue[ reg ];
+
+			return OK;
+		}
+		void cStation::Poll()
+		{
+			if( ! mySerial->IsOpened() ) {
+				myError = port_not_open;
+				return;
+			}
+
+			unsigned char buf[1000];
+			int msglen;
+			buf[0] = myAddress;
+			buf[1] = 4;
+			buf[2] = 0;				// max register 255
+			buf[3] = myFirstReg;
+			buf[4] = 0;
+			buf[5] = myCount;
+			unsigned short crc = CyclicalRedundancyCheck( buf,6);
+			buf[6] = crc >> 8;
+			buf[7] = 0xFF & crc;
+			msglen = 8;
+
+			// send the query
+			mySerial->SendData( 
+				(const unsigned char *)buf,
+				msglen );
+
+			// wait for reply
+			Sleep(300);
+			if( !mySerial->WaitForData(
+				7,
+				6000 ) ) {
+					myError = timed_out;
+					return;
+			}
+
+			// read the reply
+			memset(buf,'\0',1000);
+			msglen = mySerial->ReadData(
+				buf,
+				999);
+
+			// prevent other threads from accessing the cached values
+			boost::mutex::scoped_lock lock( myMutex );
+
+
+			// decode reply
+			int iv;
+			union  {
+				short s;
+				unsigned char c[2];
+			} v;
+			for( int k = 0; k < myCount; k++ ) {
+				v.c[0] = buf[4+k*2];
+				v.c[1] = buf[3+k*2];
+
+				iv = v.s & 0x7FFF;
+				if( v.s & 0x8000 )
+					iv -= 32767;
+				myValue[k+myFirstReg] = iv;
+			}
+
+			myError = OK;
+
+		}
+
+		cFarmodbus::cFarmodbus(void)
+		{
+			// start polling thread
+			boost::thread* pThread = new boost::thread(
+				boost::bind(
+				&cFarmodbus::Poll,		// member function
+				this ) );	
+		}
+
+		void cFarmodbus::Poll()
+		{
+			// for ever
+			for( ; ; ) {
+
+				// loop over stations
+				foreach( cStation* station, myStation ) {
+
+					// poll the station
+					station->Poll();
+				}
+
+				// allow 1 second to elapse between polls
+				Sleep(1000);
+			}
+		}
+
+		error cFarmodbus::Add( port_handle_t& handle, ::raven::cSerial& port )
+		{ 
+			myPort.push_back( cPort( port ) );
+			handle = (port_handle_t) myPort.size() - 1;
+			return OK;
+		}
+
+error 
 cFarmodbus::Add(
 		station_handle_t& station_handle,
 		port_handle_t port_handle,
@@ -64,14 +189,27 @@ cFarmodbus::Add(
 {
 	if( 0 > port_handle || port_handle >= (int) myPort.size() )
 		return bad_port_handle;
-	myStation.push_back( cStation( address, port_handle ) );
+
+	/* Construct a new station and store a pointer to it
+
+	The stations will exist for the lifetime of the program
+
+	( if this causes a memory leak, then we will need to add
+	  a method to remove the station )
+
+	  Storing a pointer is neccessary because the mutex protecting
+	  the cached values makes the station class non-copyable
+    */
+	myStation.push_back( new cStation( address, 
+									myPort[port_handle].getSerial() ) );
+
 	station_handle = (port_handle_t) myStation.size() - 1;
 
 	return OK;
 }
 
 
-cFarmodbus::error cFarmodbus::Query(
+error cFarmodbus::Query(
 		unsigned short& value,
 		station_handle_t station_handle,
 		int reg )
@@ -79,86 +217,32 @@ cFarmodbus::error cFarmodbus::Query(
 	// firewall
 	if( 0 > station_handle || station_handle >= (int) myStation.size() )
 		return bad_station_handle;
-	raven::cSerial * serial = myPort[myStation[station_handle].getPort()].getSerial();
-	if( ! serial->IsOpened() ) {
-		return port_not_open;
-	}
 	if( 0 > reg || reg > 255 )
 		return bad_register_address;
 
-	// Do a blocking, not thread safe register read
+	return myStation[station_handle]->Query( value, reg );
 
-	// TODO:  Make this non-blocking and thread safe
-
-	unsigned char buf[1000];
-	int msglen;
-		buf[0] = myStation[station_handle].getAddress() ;
-		buf[1] = 4;
-		buf[2] = 0;				// max register 255
-		buf[3] = reg;
-		buf[4] = 0;
-		buf[5] = 1;
-		unsigned short crc = CyclicalRedundancyCheck( buf,6);
-		buf[6] = crc >> 8;
-		buf[7] = 0xFF & crc;
-		msglen = 8;
-
-		// send the query
-		serial->SendData( 
-			(const unsigned char *)buf,
-			msglen );
-
-		// wait for reply
-		Sleep(300);
-		if( !serial->WaitForData(
-			7,
-			6000 ) ) {
-			return timed_out;
-		}
-
-		// read the reply
-		memset(buf,'\0',100);
-		msglen = serial->ReadData(
-			buf,
-			999);
-
-		// decode reply
-		int iv;
-		union  {
-			short s;
-			unsigned char c[2];
-		} v;
-		v.c[0] = buf[4];
-		v.c[1] = buf[3];
-
-		iv = v.s & 0x7FFF;
-		if( v.s & 0x8000 )
-			iv -= 32767;
-		value = iv;
-
-
-	return OK;
 }
-cFarmodbus::error cFarmodbus::QueryBlock(
+error cFarmodbus::QueryBlock(
 	unsigned short* value,
 	station_handle_t station,
 	int first_reg,
 	int reg_count )
 { return NYI; }
 
-cFarmodbus::error cFarmodbus::Write(
+error cFarmodbus::Write(
 		station_handle_t station,
 		int reg,
 		unsigned short value )
  { return NYI; }
-cFarmodbus::error cFarmodbus::WriteBlock(
+error cFarmodbus::WriteBlock(
 			station_handle_t station,
 		int first_reg,
 		int reg_count,
 		unsigned short * value )
  { return NYI; }
 
-unsigned short cFarmodbus::CyclicalRedundancyCheck(
+unsigned short cStation::CyclicalRedundancyCheck(
 	unsigned char * msg, int len )
 {
 	/* Table of CRC values for high–order byte */

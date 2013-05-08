@@ -9,7 +9,7 @@ int _tmain(int argc, _TCHAR* argv[])
 {
 	// construct the modbus farm
 	raven::farmodbus::cFarmodbus theModbusFarm;
-	raven::farmodbus::cFarmodbus::error error;
+	raven::farmodbus::error error;
 
 	// construct the COM port
 	raven::cSerial theCOM;
@@ -17,7 +17,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	// tell the modbus farm about the port
 	raven::farmodbus::port_handle_t port;
 	error = theModbusFarm.Add( port, theCOM );
-	if( error != raven::farmodbus::cFarmodbus::OK ) {
+	if( error != raven::farmodbus::OK ) {
 		printf("Port add error #%d\n",error);
 		return 1;
 	}
@@ -25,7 +25,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	// tell the modbus farm about the modbus device with address 1 on the port
 	raven::farmodbus::station_handle_t station;
 	error = theModbusFarm.Add( station, port, 1 );
-	if( error != raven::farmodbus::cFarmodbus::OK ) {
+	if( error != raven::farmodbus::OK ) {
 		printf("Station add error #%d\n",error);
 		return 1;
 	}
@@ -33,13 +33,17 @@ int _tmain(int argc, _TCHAR* argv[])
 	// open the port
 	theCOM.Open( "COM4" );
 
-	// read register #5
-	unsigned short value;
-	error = theModbusFarm.Query( value, station, 5 );
-	if( error != raven::farmodbus::cFarmodbus::OK ) {
-		printf("Modbus read error #%d\n", error );
-	} else {
-		printf("Successful read, register 5 = %d\n",value);
+	// Do 10 reads at 1 Hz
+	for( int k = 0; k < 10; k++ ) {
+		// read register #5
+		unsigned short value;
+		error = theModbusFarm.Query( value, station, 5 );
+		if( error != raven::farmodbus::OK ) {
+			printf("Modbus read error #%d\n", error );
+		} else {
+			printf("Successful read, register 5 = %d\n",value);
+		}
+		Sleep(1000);
 	}
 	return 0;
 }
