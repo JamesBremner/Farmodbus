@@ -64,27 +64,38 @@ public:
 // station details
 class cStation {
 
-	int myHandle;
-	static int myLastHandle;
-	int myAddress;
-	int myFirstReg;
-	int myCount;
-	
-	error myError;
-
 public:
 	cStation( int address, raven::cSerial * serial );
 
 	error Query( 
 		unsigned short& value,
 		int reg );
+	error Query( 
+		unsigned short* value,
+		int first_reg,
+		int reg_count );
 
 	void Poll();
 
 	int getHandle() { return myHandle; }
 	int getAddress() { return myAddress; }
 
+	bool CheckPolledRegisters(
+		int expected_first,
+		int expected_count )
+	{
+		return ( expected_first == myFirstReg &&
+			expected_count == myCount );
+	}
+
 private:
+
+	int myHandle;
+	static int myLastHandle;
+	int myAddress;
+	int myFirstReg;
+	int myCount;
+	error myError;
 	raven::cSerial * mySerial;
 	unsigned short myValue[255];
 	boost::mutex myMutex;
@@ -185,7 +196,7 @@ public:
 
 	@return error
 	*/
-	error QueryBlock(
+	error Query(
 		unsigned short* value,
 		station_handle_t station,
 		int first_reg,

@@ -55,6 +55,9 @@ namespace raven {
 			if( 0 > reg || reg > 255 )
 				return bad_register_address;
 
+			// prevent other threads from accessing the cached values
+			boost::mutex::scoped_lock lock( myMutex );
+
 			// check if we need to extend the registered polled
 			if( myFirstReg == -1 ) {
 				//first time called
@@ -72,8 +75,6 @@ namespace raven {
 				
 			}
 
-			// prevent other threads from accessing the cached values
-			boost::mutex::scoped_lock lock( myMutex );
 
 			// check if we have a good value from last poll
 			if( myError != OK )
@@ -84,6 +85,55 @@ namespace raven {
 
 			return OK;
 		}
+		error cStation::Query( 
+			unsigned short* value,
+			int first_reg,
+			int reg_count )
+		{
+			// prevent other threads from accessing the cached values
+			boost::mutex::scoped_lock lock( myMutex );
+
+			// check if we need to extend the registers polled
+			if( myFirstReg == -1 ) {
+				//first time called
+				myFirstReg = first_reg;
+				myCount = reg_count;
+				myError = not_ready;
+			} else {
+				int old_first = myFirstReg;
+				int old_last  = myFirstReg + myCount - 1;
+				int new_first = first_reg;
+				int new_last  = first_reg + reg_count - 1;
+				if( new_first < old_first ) {
+
+				} else {
+					new_first = old_first;
+				}
+				if( new_last > old_last ) {
+
+				} else {
+					new_last = old_last;
+				}
+				int new_count = new_last - new_first + 1;
+				if( new_first < old_first ) {
+					myFirstReg = new_first;
+					myError = not_ready;
+				}
+				if( new_count > myCount ) {
+					myCount = new_count;
+					myError = not_ready;
+				}
+			}
+
+			// check if we have a good value from last poll
+			if( myError != OK )
+				return myError;
+
+			for( int k = 0; k < myCount; k++ ) {
+				*value++ = myValue[myFirstReg+k];
+			}
+		}
+
 		void cStation::Poll()
 		{
 			if( ! mySerial->IsOpened() ) {
@@ -211,24 +261,34 @@ cFarmodbus::Add(
 
 error cFarmodbus::Query(
 		unsigned short& value,
-		station_handle_t station_handle,
+		station_handle_t station,
 		int reg )
 { 
 	// firewall
-	if( 0 > station_handle || station_handle >= (int) myStation.size() )
+	if( 0 > station || station >= (int) myStation.size() )
 		return bad_station_handle;
 	if( 0 > reg || reg > 255 )
 		return bad_register_address;
 
-	return myStation[station_handle]->Query( value, reg );
+	return myStation[station]->Query( value, reg );
 
 }
-error cFarmodbus::QueryBlock(
+error cFarmodbus::Query(
 	unsigned short* value,
 	station_handle_t station,
 	int first_reg,
 	int reg_count )
-{ return NYI; }
+{
+		// firewall
+	if( 0 > station || station >= (int) myStation.size() )
+		return bad_station_handle;
+	if( 0 > first_reg || first_reg > 255 )
+		return bad_register_address;
+	if( first_reg + reg_count - 1 > 255 )
+		return bad_register_address;
+
+	return myStation[station]->Query( value, first_reg, reg_count );
+}
 
 error cFarmodbus::Write(
 		station_handle_t station,
