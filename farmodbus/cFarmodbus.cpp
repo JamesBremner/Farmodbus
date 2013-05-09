@@ -138,6 +138,7 @@ namespace raven {
 
 		void cStation::Poll()
 		{
+			raven::set::cRunWatch runwatch("cStation::Poll");
 			if( ! mySerial->IsOpened() ) {
 				myError = port_not_open;
 				return;
@@ -162,7 +163,12 @@ namespace raven {
 				msglen );
 
 			// wait for reply
-			Sleep(300);
+
+			/** Wait for data does a 1000Hz poll
+			To prevent it using excessive CPU
+			do an initial 50ms sleep
+			*/
+			Sleep(50);
 			if( !mySerial->WaitForData(
 				7,
 				6000 ) ) {
@@ -321,6 +327,7 @@ error cFarmodbus::Query(
 		station_handle_t station,
 		int reg )
 { 
+	raven::set::cRunWatch runwatch("cFarmodbus::Query-1");
 	// firewall
 	if( ! IsSingleton() )
 		return not_singleton;
@@ -338,6 +345,7 @@ error cFarmodbus::Query(
 	int first_reg,
 	int reg_count )
 {
+	raven::set::cRunWatch runwatch("cFarmodbus::Query-2");
 		// firewall
 	if( ! IsSingleton() )
 		return not_singleton;

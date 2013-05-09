@@ -102,7 +102,7 @@ void WriterThread()
 		if( error != raven::farmodbus::OK ) {
 			printf("Modbus write error #%d\n", error );
 			// We are expecting NYIs - abort on anything else
-			if( error != raven::farmodbus::error::NYI ) {
+			if( error != raven::farmodbus::NYI ) {
 				printf("UNEXPECTED ERROR\n");
 				exit(1);
 			}
@@ -142,6 +142,7 @@ void TestThreadSafety()
 int _tmain(int argc, _TCHAR* argv[])
 {
 
+	raven::set::cRunWatch::Start();
 
 	raven::farmodbus::error error;
 
@@ -220,8 +221,12 @@ int _tmain(int argc, _TCHAR* argv[])
 		return 1;
 	}
 
+	raven::set::cRunWatch::Report();
+
 	// station unit tests
 	TestStation();
+
+
 
 
 	return 0;
