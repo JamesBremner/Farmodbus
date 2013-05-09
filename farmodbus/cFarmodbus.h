@@ -65,6 +65,8 @@ public:
 
   A write request, waiting in the write queue
 
+  Do not use this class directly in application code.
+
 */
 class cWriteWaiting {
 private:
@@ -87,6 +89,8 @@ public:
 		int reg_count,
 		unsigned short* value );
 
+	void Print();
+
 	station_handle_t getStation() { return myStation; }
 };
 
@@ -101,6 +105,8 @@ public:
   so that they can be polled regularly.
 
   It stores the results of the last read poll
+
+  Do not use this class directly in application code.
 
 */
 
@@ -346,8 +352,10 @@ private:
 	std::vector< cPort > myPort;
 	std::vector< cStation * > myStation;
 	std::queue< cWriteWaiting > myWriteQueue;
+	boost::mutex myWriteQueueMutex;
 
 	void Poll();
+	cWriteWaiting PopWriteFromQueue();
 	bool IsSingleton() { return myLastID == 1; }
 };
 	}

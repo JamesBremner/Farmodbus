@@ -1,4 +1,4 @@
-// farmodbuscpp.cpp : Basic farmodbus sanity test
+// farmodbuscpp.cpp : Modbus farm demonstration and unit tests
 //
 
 #include "stdafx.h"
@@ -71,9 +71,10 @@ int _tmain(int argc, _TCHAR* argv[])
 	// open the port
 	theCOM.Open( "COM4" );
 
-	// Do 10 reads at 1 Hz
+	// Do 10 write/reads at 1 Hz
 	unsigned short value;
 	for( int k = 0; k < 10; k++ ) {
+
 		// read register #5
 		error = theModbusFarm.Query( value, station, 1 );
 		if( error != raven::farmodbus::OK ) {
@@ -98,6 +99,20 @@ int _tmain(int argc, _TCHAR* argv[])
 			}
 			printf("\n");
 		}
+
+		// test write
+		valuebuf[0] = 10;
+		valuebuf[1] = 11;
+		valuebuf[2] = 12;
+		valuebuf[3] = 13;
+		valuebuf[4] = 14;
+		error = theModbusFarm.Write( station, 10, 5, valuebuf );
+		if( error != raven::farmodbus::OK ) {
+			printf("Modbus write error #%d\n", error );
+		} else {
+			printf("Successful write, AFAIK\n");
+		}
+
 		Sleep(1000);
 	}
 

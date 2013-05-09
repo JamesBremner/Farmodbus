@@ -202,6 +202,8 @@ namespace raven {
 
 		error cStation::Write( cWriteWaiting& W )
 		{
+			printf("NYI Write ");
+			W.Print();
 			return NYI;
 		}
 
@@ -241,16 +243,12 @@ namespace raven {
 				// loop over writes in queue
 				while( ! myWriteQueue.empty() ) {
 
-					/*  TODO: Make this thread safe.
-					Lock the queue.  Copy the write.  Pop the write. Unlock the queue.
-					Execute the write.  Repeat while writes remain on queue.
-					*/
+					// pop first write from queue
+					cWriteWaiting W = PopWriteFromQueue();
  
-					// do first write
-					myStation[myWriteQueue.front().getStation()]->Write( myWriteQueue.front() );
+					// do write
+					myStation[ W.getStation()]->Write( W );
 
-					// remove first write
-					myWriteQueue.pop();
 				}
 
 				// loop over stations
@@ -263,6 +261,21 @@ namespace raven {
 				// allow 1 second to elapse between polls
 				Sleep(1000);
 			}
+		}
+
+		/**
+
+		Pop first write from queue
+
+		@return copy of first write that was waiting on the queue
+
+		*/
+		cWriteWaiting cFarmodbus::PopWriteFromQueue()
+		{
+			boost::mutex::scoped_lock lock( myWriteQueueMutex );
+			cWriteWaiting W = myWriteQueue.front();
+			myWriteQueue.pop();
+			return W;
 		}
 
 		error cFarmodbus::Add( port_handle_t& handle, ::raven::cSerial& port )
@@ -356,6 +369,7 @@ error cFarmodbus::Write(
 	// This will be executed in the polling thread
 	// next time it wakes up
 
+	boost::mutex::scoped_lock lock( myWriteQueueMutex );
 	myWriteQueue.push( cWriteWaiting( station, first_reg, reg_count, value ) );
 
 	// return immediatly.
@@ -381,10 +395,30 @@ cWriteWaiting::cWriteWaiting(
 		, myCount( reg_count )
 {
 	// Copy the values to be written into our own attribute
+
+	/* We use an STL vector to store the values.
+	This is convenient and safe, requiring the minimum of code
+	and almost nothing can go wrong!
+	It is not especially efficient.  This class is going to be copied,
+	so the vector will be copied also.  If huge numbers of large block
+	writes cause a problem, then it might be neccessary to allocate a buffer
+	and use a pointer to the buffer, saving the vector copies, but requiring
+	careful coding to prevent memory leaks.
+	*/
 	for( int k = 0; k< myCount; k++ ) {
 		myValue.push_back( *value++ );
 	}
 }
+void cWriteWaiting::Print()
+{
+	printf("Station %d Register %d to %d ( ",
+		(int)myStation,myFirstReg,myFirstReg+myCount-1);
+	for( int k = 0; k < myCount; k++ ) {
+		printf("%d ",myValue[k]);
+	}
+	printf(" )\n");
+}
+
 
 unsigned short cStation::CyclicalRedundancyCheck(
 	unsigned char * msg, int len )
