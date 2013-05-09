@@ -13,6 +13,7 @@
 
 
 #include <vector>
+#include <queue>
 #include <boost/thread/thread.hpp>
 #include <boost/foreach.hpp>
 #define foreach         BOOST_FOREACH

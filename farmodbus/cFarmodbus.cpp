@@ -27,7 +27,7 @@
 namespace raven {
 	namespace farmodbus {
 
-		// keep track of port and station handles,
+		// keep track of indices( handles )
 		// so no duplicates are created
 		int cPort::myLastID = 0;
 		int cStation::myLastHandle = 0;
@@ -200,9 +200,15 @@ namespace raven {
 
 		}
 
+		error cStation::Write( cWriteWaiting& W )
+		{
+			return NYI;
+		}
+
+
 		cFarmodbus::cFarmodbus(void)
 		{
-			// ensure thast the app only creates one of these
+			// ensure that the app only creates one of these
 			myLastID++;
 			if( ! IsSingleton() )
 				return;
@@ -213,11 +219,39 @@ namespace raven {
 				&cFarmodbus::Poll,		// member function
 				this ) );	
 		}
+		/**
 
+		The polling thread method.
+
+		This method never returns.
+		It should run in its own thread, and should be the ONLY
+		code that actually does read/writes on the communication ports
+
+		First it checks the write queue, and performs any write reuests.
+		Second it reads all the registers that the application code has requested a read from
+		Third it sleeps for 1 second.
+		Repeats for ever
+
+		*/
 		void cFarmodbus::Poll()
 		{
 			// for ever
 			for( ; ; ) {
+
+				// loop over writes in queue
+				while( ! myWriteQueue.empty() ) {
+
+					/*  TODO: Make this thread safe.
+					Lock the queue.  Copy the write.  Pop the write. Unlock the queue.
+					Execute the write.  Repeat while writes remain on queue.
+					*/
+ 
+					// do first write
+					myStation[myWriteQueue.front().getStation()]->Write( myWriteQueue.front() );
+
+					// remove first write
+					myWriteQueue.pop();
+				}
 
 				// loop over stations
 				foreach( cStation* station, myStation ) {
@@ -301,17 +335,56 @@ error cFarmodbus::Query(
 	return myStation[station]->Query( value, first_reg, reg_count );
 }
 
+
 error cFarmodbus::Write(
-		station_handle_t station,
-		int reg,
-		unsigned short value )
- { return NYI; }
-error cFarmodbus::WriteBlock(
 			station_handle_t station,
 		int first_reg,
 		int reg_count,
 		unsigned short * value )
- { return NYI; }
+ { 
+	 		// firewall
+	if( ! IsSingleton() )
+		return not_singleton;
+	if( 0 > station || station >= (int) myStation.size() )
+		return bad_station_handle;
+	if( 0 > first_reg || first_reg > 255 )
+		return bad_register_address;
+	if( first_reg + reg_count - 1 > 255 )
+		return bad_register_address;
+
+	// Add the write to the end of the write queue
+	// This will be executed in the polling thread
+	// next time it wakes up
+
+	myWriteQueue.push( cWriteWaiting( station, first_reg, reg_count, value ) );
+
+	// return immediatly.
+	// The write is not yet fully implemented
+	return NYI; 
+}
+
+error cFarmodbus::Write(
+		station_handle_t station,
+		int reg,
+		unsigned short value )
+ {
+	 // Convert this to a block write of count 1
+	 return Write( station, reg, 1, &value );
+}
+cWriteWaiting::cWriteWaiting(
+		station_handle_t station,
+		int first_reg,
+		int reg_count,
+		unsigned short* value )
+		: myStation( station )
+		, myFirstReg( first_reg )
+		, myCount( reg_count )
+{
+	// Copy the values to be written into our own attribute
+	for( int k = 0; k< myCount; k++ ) {
+		myValue.push_back( *value++ );
+	}
+}
 
 unsigned short cStation::CyclicalRedundancyCheck(
 	unsigned char * msg, int len )

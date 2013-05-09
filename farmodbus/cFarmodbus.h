@@ -32,7 +32,7 @@ namespace raven {
 
 	/**
 
-	Error return values
+	Error return values from the modbus farm
 
 	*/
 	enum error {
@@ -61,26 +61,129 @@ public:
 	int getID() { return myID; }
 	cSerial* getSerial() { return mySerial; }
 };
+/**
 
-// station details
+  A write request, waiting in the write queue
+
+*/
+class cWriteWaiting {
+private:
+	station_handle_t myStation;
+	int myFirstReg;
+	int myCount;
+	std::vector< unsigned short > myValue;
+
+public:
+	/** Constructor
+
+	@param[in] station handle
+	@param[in] first_reg offset of first register to be written to
+	@param[in] reg_count number of registers to be written to
+	@param[in] value pointer to buffer containg values to write, one 16bit value per register
+	*/
+	cWriteWaiting(
+		station_handle_t station,
+		int first_reg,
+		int reg_count,
+		unsigned short* value );
+
+	station_handle_t getStation() { return myStation; }
+};
+
+/**
+
+  A modbus station
+
+  This provides read/write access to the device registers that can
+  be accessed through a single modbus address.
+
+  It stores the offsets of all registers read from this station, 
+  so that they can be polled regularly.
+
+  It stores the results of the last read poll
+
+*/
+
 class cStation {
 
 public:
 	cStation( int address, raven::cSerial * serial );
 
+	/**
+
+	Return value read from a register on last poll
+
+	@param[out] value read from register on last poll
+	@param[in] reg register offset
+
+	@return error found on last poll, or invalid parameters
+
+	*/
 	error Query( 
 		unsigned short& value,
 		int reg );
+	/**
+
+	Return value read from a block of registers on last poll
+
+	@param[in] value pointer to buffer long enough to contsain values read
+	@param[in] first_reg first register offset
+	@param[in] reg_count number of registers to be read
+
+	@return error found on last poll, or invalid parameters
+
+	*/
 	error Query( 
 		unsigned short* value,
 		int first_reg,
 		int reg_count );
 
+	/**
+
+	Execute a write that has been popped off the write queue
+
+	@param[in] W The write request
+
+	@return error
+
+	This should ONLY be called from the polling thread,
+	never from any application thread.
+
+	NYI
+
+	*/
+	error Write( cWriteWaiting& W );
+
+	/**
+
+	Read all registers that the application is interested in.
+
+	This should ONLY be called from the polling thread,
+	never from any application thread.
+
+	The values read are stored in the private attribute myValue
+
+	*/
 	void Poll();
 
 	int getHandle() { return myHandle; }
 	int getAddress() { return myAddress; }
 
+	/**
+
+	True if polled registers are as expected.
+
+	@param[in] expected_first
+	@param[in] expected_count
+
+	@return True if polled registers are as expected.
+
+	The station maintains a range of registers that are polled.
+	The list is updated when a novel read request is received for the station.
+	This is used by the unit tests to ensure that the list is correctly updated,
+	it is not used by production code.
+
+	*/
 	bool CheckPolledRegisters(
 		int expected_first,
 		int expected_count )
@@ -106,6 +209,7 @@ private:
 
 
 };
+
 
 /**
 
@@ -230,7 +334,7 @@ public:
 	@return error
 
 	*/
-	error WriteBlock(
+	error Write(
 		station_handle_t station,
 		int first_reg,
 		int reg_count,
@@ -241,6 +345,7 @@ private:
 	static int myLastID;
 	std::vector< cPort > myPort;
 	std::vector< cStation * > myStation;
+	std::queue< cWriteWaiting > myWriteQueue;
 
 	void Poll();
 	bool IsSingleton() { return myLastID == 1; }
