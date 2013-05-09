@@ -5,8 +5,14 @@
 #include "cFarmodbus.h"
 #include "Serial.h"
 
+	// construct the modbus farm
+	raven::farmodbus::cFarmodbus theModbusFarm;
+
+
 void TestStation()
 {
+	// construct a test station
+	// ( production code should NOT do this! )
 	raven::farmodbus::cStation station( 1, 0 );
 
 	unsigned short v[255];
@@ -40,13 +46,103 @@ void TestStation()
 	}
 
 }
+
+void ReaderThread()
+{
+	// Give each thread its own register to read
+	static int next_reg_to_read = 0;		// This is NOT thread specific
+	next_reg_to_read++;
+	static boost::thread_specific_ptr< int > reg_to_read;
+	if( ! reg_to_read.get() ) {
+		// first time called by this thread
+		// construct test element to be used in all subsequent calls from this thread
+		reg_to_read.reset( new int);
+	}
+	*reg_to_read = next_reg_to_read;
+
+	unsigned short value;
+	for( int k = 0; k < 100; k++ ) {
+
+		// read register #5
+		raven::farmodbus::error error = theModbusFarm.Query( value, 0, *reg_to_read );
+		if( error != raven::farmodbus::OK ) {
+			printf("Modbus read error #%d register %d\n", 
+				error,*reg_to_read );
+		} else {
+			printf("Successful read, register %d = %d\n",
+				*reg_to_read,value);
+		}
+
+		Sleep(100);
+	}
+
+}
+
+void WriterThread()
+{
+	// Give each thread its own register to read
+	static int next_reg_to_read = 0;		// This is NOT thread specific
+	next_reg_to_read += 10;
+	static boost::thread_specific_ptr< int > reg_to_read;
+	if( ! reg_to_read.get() ) {
+		// first time called by this thread
+		// construct test element to be used in all subsequent calls from this thread
+		reg_to_read.reset( new int);
+	}
+	*reg_to_read = next_reg_to_read;
+
+	unsigned short valuebuf[5];
+	for( int k = 0; k < 100; k++ ) {
+		valuebuf[0] = 10;
+		valuebuf[1] = 11;
+		valuebuf[2] = 12;
+		valuebuf[3] = 13;
+		valuebuf[4] = 14;
+		raven::farmodbus::error error = theModbusFarm.Write( 0, *reg_to_read, 5, valuebuf );
+		if( error != raven::farmodbus::OK ) {
+			printf("Modbus write error #%d\n", error );
+			// We are expecting NYIs - abort on anything else
+			if( error != raven::farmodbus::error::NYI ) {
+				printf("UNEXPECTED ERROR\n");
+				exit(1);
+			}
+		} else {
+			printf("Successful write, AFAIK\n");
+		}
+		Sleep(100);
+	}
+
+
+}
+
+
+void TestThreadSafety()
+{
+	printf("Thread safety test begin ...\n");
+
+	// Do an initial read and allow the polling to settle down
+	unsigned short value[5];
+	theModbusFarm.Query( value, 0, 1, 5 );
+	Sleep(2000);
+	printf("Polling started\n");
+
+	boost::thread_group g;
+
+	g.create_thread( &ReaderThread );
+	g.create_thread( &ReaderThread );
+	g.create_thread( &WriterThread );
+	g.create_thread( &WriterThread );
+
+	g.join_all();
+
+	printf("Thread safety test end \n");
+
+}
+
 int _tmain(int argc, _TCHAR* argv[])
 {
-	// station unit tests
-	TestStation();
 
-	// construct the modbus farm
-	raven::farmodbus::cFarmodbus theModbusFarm;
+
 	raven::farmodbus::error error;
 
 	// construct the COM port
@@ -70,6 +166,8 @@ int _tmain(int argc, _TCHAR* argv[])
 
 	// open the port
 	theCOM.Open( "COM4" );
+
+	TestThreadSafety();
 
 	// Do 10 write/reads at 1 Hz
 	unsigned short value;
@@ -121,6 +219,10 @@ int _tmain(int argc, _TCHAR* argv[])
 		printf("ERROR: Failed to enforce singleton\n");
 		return 1;
 	}
+
+	// station unit tests
+	TestStation();
+
 
 	return 0;
 }

@@ -196,6 +196,9 @@ namespace raven {
 				myValue[k+myFirstReg] = iv;
 			}
 
+			//printf("Poll OK Station %d, FirstReg %d, Count %d\n",
+			//	myHandle, myFirstReg, myCount );
+
 			myError = OK;
 
 		}
