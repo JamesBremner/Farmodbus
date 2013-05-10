@@ -149,6 +149,11 @@ int _tmain(int argc, _TCHAR* argv[])
 	// construct the COM port
 	raven::cSerial theCOM;
 
+	// configure modbus farm for T3000
+	raven::farmodbus::cFarmodbusConfig T3000Config;
+	T3000Config.Set("T3000");
+	theModbusFarm.Set( T3000Config );
+
 	// tell the modbus farm about the port
 	raven::farmodbus::port_handle_t port;
 	error = theModbusFarm.Add( port, theCOM );
@@ -166,7 +171,17 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	// open the port
-	theCOM.Open( "COM4" );
+	char * portsz = "COM8";
+	theCOM.Open( portsz );
+	std::wstring port_config_text;
+	theCOM.getConfig(port_config_text);
+	if( ! theCOM.IsOpened() ) {
+		printf("Failed to open port %s\n"
+			"Will continue to test port not open error handling\n",
+			portsz);
+	} else {
+		printf("%S\n",port_config_text.c_str());
+	}
 
 	TestThreadSafety();
 

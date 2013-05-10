@@ -216,6 +216,51 @@ private:
 
 };
 
+/**
+
+ Modbus Farm configuration
+
+ */
+ class cFarmodbusConfig
+ {
+ public:
+
+	 /**
+	 MODBUS read command
+
+	 Defaults to 4
+
+	 3 is also possible, and is used by the T3000 system
+
+	 The '3' command is used to read a 'holding register'.
+	 The '4' command is used to read an 'input register'.
+	 The ICP-DAS M7017 responds to a '4' command.
+	 The simodbus station simulator responds to both
+
+	 */
+	 int ModbusReadCommand;
+
+	 /**
+
+	 Construct configuration with default values
+
+	 */
+	 cFarmodbusConfig()
+		 :
+	 ModbusReadCommand( 4 )
+	 {}
+
+	 /**
+	 Set configuration values for a particular system
+
+	 @param[in] system_name  name of system targetted by the configuration
+
+	 "T3000" is implemented
+
+	 */
+	 void Set( const char* system_name );
+
+ };
 
 /**
 
@@ -239,6 +284,16 @@ public:
 	*/
 
 	cFarmodbus(void);
+
+	/**
+
+	Change default configuration
+
+	@param[in] config  the new configuration
+
+	*/
+
+	void Set( cFarmodbusConfig& config );
 
 	/**
 

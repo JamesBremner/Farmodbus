@@ -33,6 +33,9 @@ namespace raven {
 		int cStation::myLastHandle = 0;
 		int cFarmodbus::myLastID = 0;
 
+		// The active configuration
+		cFarmodbusConfig theConfig;
+
 		cPort::cPort( cSerial& serial )
 		{
 			myID = myLastID++;
@@ -145,9 +148,11 @@ namespace raven {
 			}
 
 			unsigned char buf[1000];
+
+			// assemble the modbus read command
 			int msglen;
 			buf[0] = myAddress;
-			buf[1] = 4;
+			buf[1] = theConfig.ModbusReadCommand;
 			buf[2] = 0;				// max register 255
 			buf[3] = myFirstReg;
 			buf[4] = 0;
@@ -230,6 +235,20 @@ namespace raven {
 				&cFarmodbus::Poll,		// member function
 				this ) );	
 		}
+		void cFarmodbus::Set( cFarmodbusConfig& config )
+		{
+			theConfig = config;
+		}
+
+		void cFarmodbusConfig::Set( const char* system_name )
+		{
+			if( std::string( system_name ) == std::string("T3000") ) {
+
+				// Change configuration defaults to T3000 settings
+				ModbusReadCommand = 3;
+			}
+		}
+
 		/**
 
 		The polling thread method.
