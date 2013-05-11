@@ -37,20 +37,124 @@ namespace raven {
 		cFarmodbusConfig theConfig;
 
 		cPort::cPort( cSerial& serial )
+			: myFlagTCP( false )
 		{
 			myID = myLastID++;
 			mySerial = &serial;
 		}
+		cPort::cPort( SOCKET s )
+			: myFlagTCP( true )
+		{
+			myID = myLastID++;
+			mySocket = s;
+		}
+		bool cPort::IsOpen()
+		{
+			if( myFlagTCP ) {
+				// assume socket is always open
+				return true;
+			} else {
+				return mySerial->IsOpened();
+			}
+		}
+		/**
+
+  Send data to the port
+
+  @param[in] buffer  pointer to data to be written
+  @param[in] size    number of bytes to write
+
+  @return 0 if error
+
+  */
+		int cPort::SendData( const unsigned char *msg, int length )
+		{
+			if( myFlagTCP ) {
+				int iResult = send( mySocket,
+					(const char* )msg, length, 0 );
+				if (iResult == SOCKET_ERROR) {
+					return 0;
+				}
+				return length;
+			} else {
+				return mySerial->SendData( msg, length );
+			}
+		}
+		/**
+
+	Blocking wait for an amount of data to be ready
+
+  @param[in] len number of bytes required
+  @param[in] msec number of milliseconds to wait
+
+  @return 1 if data ready, 0 if timeout
+
+  */
+		int cPort::WaitForData( int len, int msec )
+		{
+			if( myFlagTCP ) {
+				int timeout = 0;
+				while( ! TCPReadDataWaiting() )
+				{
+					if( timeout++ > msec ) {
+						return 0;
+					}
+					Sleep(1);
+				}
+				// TODO  check for length of data waiting
+				return 1;
+
+			} else {
+				return mySerial->WaitForData( len, msec );
+			}
+
+		}
+		/**
+
+  True if data available to be read
+
+*/
+int cPort::TCPReadDataWaiting( void )
+{
+		fd_set fds;
+		FD_ZERO( &fds );
+		FD_SET( mySocket, &fds );
+		TIMEVAL timeout;
+		timeout.tv_sec = 0;
+		timeout.tv_usec = 10000;
+		return ( select( 0, &fds, 0, 0, &timeout ) == 1 );
+
+}
+/**
+
+  Read data from port
+
+  @param[in] buffer pointer to location to store data
+  @param[in] limit  maximum number of bytes to read
+
+  @return  0 if error, number of bytes read otherwise
+
+*/
+		int cPort::ReadData( void *buffer, int limit )
+		{
+			if( myFlagTCP ) {
+				return recv( mySocket, (char*)buffer, limit, 0 );
+			} else {
+				return mySerial->ReadData( buffer, limit );
+			}
+
+		}
 		cStation::cStation( 
 			int address,
-			raven::cSerial * serial )
+			cPort& port )
 			: myAddress( address )
-			, mySerial( serial )
+			, myPort( port )
 			, myFirstReg( -1 )
 			, myError( not_ready )
 		{
 			myHandle  = myLastHandle++;
 		}
+
 		error cStation::Query( 
 			unsigned short& value,
 			int reg )
@@ -142,7 +246,7 @@ namespace raven {
 		void cStation::Poll()
 		{
 			raven::set::cRunWatch runwatch("cStation::Poll");
-			if( ! mySerial->IsOpened() ) {
+			if( ! myPort.IsOpen() ) {
 				myError = port_not_open;
 				return;
 			}
@@ -163,7 +267,7 @@ namespace raven {
 			msglen = 8;
 
 			// send the query
-			mySerial->SendData( 
+			myPort.SendData( 
 				(const unsigned char *)buf,
 				msglen );
 
@@ -174,7 +278,7 @@ namespace raven {
 			do an initial 50ms sleep
 			*/
 			Sleep(50);
-			if( !mySerial->WaitForData(
+			if( !myPort.WaitForData(
 				7,
 				6000 ) ) {
 					myError = timed_out;
@@ -183,7 +287,7 @@ namespace raven {
 
 			// read the reply
 			memset(buf,'\0',1000);
-			msglen = mySerial->ReadData(
+			msglen = myPort.ReadData(
 				buf,
 				999);
 
@@ -313,6 +417,14 @@ namespace raven {
 			return OK;
 		}
 
+		error cFarmodbus::Add( port_handle_t& handle, SOCKET port )
+		{
+			myPort.push_back( cPort( port ) );
+			handle = (port_handle_t) myPort.size() - 1;
+			return OK;
+
+		}
+
 error 
 cFarmodbus::Add(
 		station_handle_t& station_handle,
@@ -333,7 +445,7 @@ cFarmodbus::Add(
 	  the cached values makes the station class non-copyable
     */
 	myStation.push_back( new cStation( address, 
-									myPort[port_handle].getSerial() ) );
+									myPort[port_handle] ) );
 
 	station_handle = (port_handle_t) myStation.size() - 1;
 

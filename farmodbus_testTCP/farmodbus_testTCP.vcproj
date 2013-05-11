@@ -2,9 +2,9 @@
 <VisualStudioProject
 	ProjectType="Visual C++"
 	Version="9.00"
-	Name="farmodbus_test"
-	ProjectGUID="{C52BA3E4-B598-402D-B050-561C414A7149}"
-	RootNamespace="farmodbuscpp"
+	Name="farmodbus_testTCP"
+	ProjectGUID="{5ACF7654-730B-46B5-8DE7-98F2CC0AE219}"
+	RootNamespace="farmodbus_testTCP"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="196613"
 	>
@@ -181,11 +181,11 @@
 				>
 			</File>
 			<File
-				RelativePath="$(RAVENROOT)\cRunWatch.cpp"
+				RelativePath="$(ravenroot)\cRunWatch.cpp"
 				>
 			</File>
 			<File
-				RelativePath=".\farmodbus_test.cpp"
+				RelativePath=".\farmodbus_testTCP.cpp"
 				>
 			</File>
 			<File
@@ -239,11 +239,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\..\ravenset\cRunWatch.h"
+				RelativePath="$(ravenroot)\cRunWatch.h"
 				>
 			</File>
 			<File
-				RelativePath="..\..\ravenset\Serial.h"
+				RelativePath="$(ravenroot)\Serial.h"
 				>
 			</File>
 			<File
@@ -261,6 +261,10 @@
 			UniqueIdentifier="{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}"
 			>
 		</Filter>
+		<File
+			RelativePath=".\ReadMe.txt"
+			>
+		</File>
 	</Files>
 	<Globals>
 	</Globals>

@@ -1,7 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 10.00
 # Visual Studio 2008
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "farmodbuscpp", "farmodbus\farmodbuscpp.vcproj", "{C52BA3E4-B598-402D-B050-561C414A7149}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "farmodbus_test", "farmodbus\farmodbuscpp.vcproj", "{C52BA3E4-B598-402D-B050-561C414A7149}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "farmodbus_testTCP", "farmodbus_testTCP\farmodbus_testTCP.vcproj", "{5ACF7654-730B-46B5-8DE7-98F2CC0AE219}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,6 +15,10 @@ Global
 		{C52BA3E4-B598-402D-B050-561C414A7149}.Debug|Win32.Build.0 = Debug|Win32
 		{C52BA3E4-B598-402D-B050-561C414A7149}.Release|Win32.ActiveCfg = Release|Win32
 		{C52BA3E4-B598-402D-B050-561C414A7149}.Release|Win32.Build.0 = Release|Win32
+		{5ACF7654-730B-46B5-8DE7-98F2CC0AE219}.Debug|Win32.ActiveCfg = Debug|Win32
+		{5ACF7654-730B-46B5-8DE7-98F2CC0AE219}.Debug|Win32.Build.0 = Debug|Win32
+		{5ACF7654-730B-46B5-8DE7-98F2CC0AE219}.Release|Win32.ActiveCfg = Release|Win32
+		{5ACF7654-730B-46B5-8DE7-98F2CC0AE219}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

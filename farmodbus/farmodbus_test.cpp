@@ -13,7 +13,8 @@ void TestStation()
 {
 	// construct a test station
 	// ( production code should NOT do this! )
-	raven::farmodbus::cStation station( 1, 0 );
+	raven::farmodbus::cPort port( 0 );
+	raven::farmodbus::cStation station( 1, port );
 
 	unsigned short v[255];
 	station.Query( v, 1, 2 );
@@ -33,7 +34,7 @@ void TestStation()
 		exit(1);
 	}
 
-	raven::farmodbus::cStation station2( 1, 0 );
+	raven::farmodbus::cStation station2( 1, port );
 	station2.Query( v, 8, 7 );
 	if( ! station2.CheckPolledRegisters( 8,7 ) ) {
 		printf("Failed TestStation #4\n");
@@ -60,10 +61,12 @@ void ReaderThread()
 	}
 	*reg_to_read = next_reg_to_read;
 
+	const int number_of_reads = 10;
 	unsigned short value;
-	for( int k = 0; k < 100; k++ ) {
+	for( int k = 0; k < number_of_reads; k++ ) {
 
-		// read register #5
+		value = 9988;
+		// read register
 		raven::farmodbus::error error = theModbusFarm.Query( value, 0, *reg_to_read );
 		if( error != raven::farmodbus::OK ) {
 			printf("Modbus read error #%d register %d\n", 
@@ -91,8 +94,9 @@ void WriterThread()
 	}
 	*reg_to_read = next_reg_to_read;
 
+	const int number_of_writes = 10;
 	unsigned short valuebuf[5];
-	for( int k = 0; k < 100; k++ ) {
+	for( int k = 0; k < number_of_writes; k++ ) {
 		valuebuf[0] = 10;
 		valuebuf[1] = 11;
 		valuebuf[2] = 12;

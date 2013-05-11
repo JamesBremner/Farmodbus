@@ -48,18 +48,34 @@ namespace raven {
 	};
 
 
-	// port details
+	/**
+	
+	A wrapper for a serial port or a TCP socket
+	
+	*/
 class cPort {
 
-	int myID;
-	static int myLastID;
-	cSerial* mySerial;
+	int			myID;
+	static int	myLastID;
+	cSerial*	mySerial;
+	SOCKET		mySocket;
+	bool		myFlagTCP;
 
 public:
+	/// Construct serial port
 	cPort( cSerial& serial );
+	/// Construct TCP port
+	cPort( SOCKET s );
 
 	int getID() { return myID; }
 	cSerial* getSerial() { return mySerial; }
+	bool IsOpen();
+	int SendData( const unsigned char *msg, int length );
+	int WaitForData( int len, int msec );
+	int ReadData( void *buffer, int limit );
+
+private:
+	int TCPReadDataWaiting( void );
 };
 /**
 
@@ -113,7 +129,7 @@ public:
 class cStation {
 
 public:
-	cStation( int address, raven::cSerial * serial );
+	cStation( int address, cPort& port );
 
 	/**
 
@@ -206,7 +222,7 @@ private:
 	int myFirstReg;
 	int myCount;
 	error myError;
-	raven::cSerial * mySerial;
+	cPort& myPort;
 	unsigned short myValue[255];
 	boost::mutex myMutex;
 
@@ -304,14 +320,29 @@ public:
 
 	@return error
 
-	TODO: Add TCP port ( socket )
-
 	Once a port is added to the modbus farm with some stations
 	then polling will start and continue on the port.  NOTHING ELSE
 	SHOULD access the port once this begins.
 
 	*/
 	error Add( port_handle_t& handle, cSerial& port );
+
+	/**
+
+	Add TCP port
+
+	@param[out] handle  Use when defining which port a modbus station is connected through
+	@param[in]  socket  Tje TCP socket through which modbus stations can be connected
+
+	@return error
+
+	Once a port is added to the modbus farm with some stations
+	then polling will start and continue on the port.  NOTHING ELSE
+	SHOULD access the port once this begins.
+
+	*/
+
+	error Add( port_handle_t& handle, SOCKET port );
 
 	/**
 
