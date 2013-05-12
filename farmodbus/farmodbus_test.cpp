@@ -224,12 +224,14 @@ int _tmain(int argc, _TCHAR* argv[])
 		valuebuf[2] = 12;
 		valuebuf[3] = 13;
 		valuebuf[4] = 14;
-		error = theModbusFarm.Write( station, 10, 5, valuebuf );
+		error = theModbusFarm.Write( station, 10, valuebuf[0] );
 		if( error != raven::farmodbus::OK ) {
 			printf("Modbus write error #%d\n", error );
 		} else {
 			printf("Successful write, AFAIK\n");
 		}
+
+		error = theModbusFarm.Query( valuebuf[0], station, 5 );
 
 		Sleep(1000);
 	}

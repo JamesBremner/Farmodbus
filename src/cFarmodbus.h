@@ -45,6 +45,8 @@ namespace raven {
 		bad_register_address,
 		not_ready,					///< polling has not yet been completed
 		not_singleton,				///< the application must only create ONE cFarmodbus
+		device_exception,			///< modbus device returned well formatted reply with error message
+		device_error,				///< modbus device reply unrecognized
 	};
 
 
@@ -107,7 +109,10 @@ public:
 
 	void Print();
 
-	station_handle_t getStation() { return myStation; }
+	station_handle_t getStation()	{ return myStation; }
+	int getFirstReg()				{ return myFirstReg; }
+	unsigned short getValue()		{ return myValue[0]; }
+	int getCount()					{ return myCount; }
 };
 
 /**

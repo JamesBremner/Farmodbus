@@ -320,9 +320,61 @@ int cPort::TCPReadDataWaiting( void )
 
 		error cStation::Write( cWriteWaiting& W )
 		{
-			printf("NYI Write ");
-			W.Print();
-			return NYI;
+			if( ! myPort.IsOpen() ) {
+				myError = port_not_open;
+				return port_not_open;
+			}
+			if( W.getCount() != 1 ) {
+				myError = NYI;
+				return NYI;
+			}
+
+			unsigned char buf[1000];
+
+			// assemble the modbus read command
+			int msglen;
+			buf[0] = myAddress;
+			buf[1] = 6;				// single register read command
+			buf[2] = 0;				// max register 255
+			buf[3] = W.getFirstReg();
+			buf[4] = 0;
+			buf[5] = (unsigned char)W.getValue();
+			unsigned short crc = CyclicalRedundancyCheck( buf,6);
+			buf[6] = crc >> 8;
+			buf[7] = 0xFF & crc;
+			msglen = 8;
+
+			// send the query
+			myPort.SendData( 
+				(const unsigned char *)buf,
+				msglen );
+
+			// wait for reply
+
+			/** Wait for data does a 1000Hz poll
+			To prevent it using excessive CPU
+			do an initial 50ms sleep
+			*/
+			Sleep(50);
+			if( !myPort.WaitForData(
+				7,
+				6000 ) ) {
+					myError = timed_out;
+					return timed_out;
+			}
+
+			// read the reply
+			memset(buf,'\0',1000);
+			msglen = myPort.ReadData(
+				buf,
+				999);
+
+			if( buf[1] == 6 )
+				return OK;
+			if( buf[1] == 86 )
+				return device_exception;
+			return device_error;
+
 		}
 
 
@@ -515,8 +567,7 @@ error cFarmodbus::Write(
 	myWriteQueue.push( cWriteWaiting( station, first_reg, reg_count, value ) );
 
 	// return immediatly.
-	// The write is not yet fully implemented
-	return NYI; 
+	return OK; 
 }
 
 error cFarmodbus::Write(
