@@ -61,7 +61,11 @@ void ReaderThread()
 	}
 	*reg_to_read = next_reg_to_read;
 
-	const int number_of_reads = 10;
+	bool flagError = false;
+
+	// Do a bunch of reads at 10Hz
+
+	const int number_of_reads = 100;
 	unsigned short value;
 	for( int k = 0; k < number_of_reads; k++ ) {
 
@@ -71,12 +75,17 @@ void ReaderThread()
 		if( error != raven::farmodbus::OK ) {
 			printf("Modbus read error #%d register %d\n", 
 				error,*reg_to_read );
+			flagError = true;
 		} else {
-			printf("Successful read, register %d = %d\n",
-				*reg_to_read,value);
+			//printf("Successful read, register %d = %d\n",
+			//	*reg_to_read,value);
 		}
 
 		Sleep(100);
+	}
+	if( ! flagError ) {
+		printf("%d reads successfully completed on register %d\n",
+			number_of_reads, *reg_to_read );
 	}
 
 }
@@ -94,7 +103,9 @@ void WriterThread()
 	}
 	*reg_to_read = next_reg_to_read;
 
-	const int number_of_writes = 10;
+
+	bool flagError = false;
+	const int number_of_writes = 100;
 	unsigned short valuebuf[5];
 	for( int k = 0; k < number_of_writes; k++ ) {
 		valuebuf[0] = 10;
@@ -102,18 +113,19 @@ void WriterThread()
 		valuebuf[2] = 12;
 		valuebuf[3] = 13;
 		valuebuf[4] = 14;
-		raven::farmodbus::error error = theModbusFarm.Write( 0, *reg_to_read, 5, valuebuf );
+		raven::farmodbus::error error = theModbusFarm.Write( 0, *reg_to_read, valuebuf[0] );
 		if( error != raven::farmodbus::OK ) {
-			printf("Modbus write error #%d\n", error );
-			// We are expecting NYIs - abort on anything else
-			if( error != raven::farmodbus::NYI ) {
-				printf("UNEXPECTED ERROR\n");
-				exit(1);
-			}
+			printf("Modbus write error #%d on register %d\n",
+				error, *reg_to_read );
+			flagError = true;
 		} else {
-			printf("Successful write, AFAIK\n");
+			//printf("Successful write, AFAIK\n");
 		}
 		Sleep(100);
+	}
+	if( ! flagError ) {
+		printf("%d writes successfully completed on register %d\n",
+			number_of_writes, *reg_to_read );
 	}
 
 
@@ -175,7 +187,7 @@ int _tmain(int argc, _TCHAR* argv[])
 	}
 
 	// open the port
-	char * portsz = "COM8";
+	char * portsz = "COM4";
 	theCOM.Open( portsz );
 	std::wstring port_config_text;
 	theCOM.getConfig(port_config_text);
@@ -228,7 +240,7 @@ int _tmain(int argc, _TCHAR* argv[])
 		if( error != raven::farmodbus::OK ) {
 			printf("Modbus write error #%d\n", error );
 		} else {
-			printf("Successful write, AFAIK\n");
+			printf("Successful write\n");
 		}
 
 		error = theModbusFarm.Query( valuebuf[0], station, 5 );

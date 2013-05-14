@@ -176,8 +176,6 @@ public:
 	This should ONLY be called from the polling thread,
 	never from any application thread.
 
-	NYI
-
 	*/
 	error Write( cWriteWaiting& W );
 
@@ -192,6 +190,22 @@ public:
 
 	*/
 	void Poll();
+
+	/**
+
+	Get error flag from previous poll write on this station
+
+	@return error flag
+
+	This clears the error
+
+	*/
+	error getWriteError()
+	{ 
+		error err = myWriteError;
+		myWriteError = OK;
+		return err;
+	}
 
 	int getHandle() { return myHandle; }
 	int getAddress() { return myAddress; }
@@ -227,6 +241,7 @@ private:
 	int myFirstReg;
 	int myCount;
 	error myError;
+	error myWriteError;
 	cPort& myPort;
 	unsigned short myValue[255];
 	boost::mutex myMutex;
@@ -253,8 +268,8 @@ private:
 
 	 3 is also possible, and is used by the T3000 system
 
-	 The '3' command is used to read a 'holding register'.
-	 The '4' command is used to read an 'input register'.
+	 The '3' command is used to read a 'holding register' which is read-write by the application
+	 The '4' command is used to read an 'input register' which is read only by the application
 	 The ICP-DAS M7017 responds to a '4' command.
 	 The simodbus station simulator responds to both
 
@@ -411,7 +426,7 @@ public:
 	@param[in] reg register to write
 	@param[in] value to write
 
-	@return error
+	@return error from PREVIOUS poll, or parameter errors
 
 	*/
 
@@ -428,7 +443,15 @@ public:
 	@param[in] reg_count number of registers to write
 	@param[in] value pointer to buffer of values to write
 
-	@return error
+	@return error from PREVIOUS poll, or parameter errors
+
+	This adds the write request to the write queue.  
+	It will be executed at the beginning of the next poll.
+	If there is an error in the parameters, then the error return
+	will indicate so.  If there was an error executing a read on
+	a previous poll, then the error return from this call
+	will indicate that.  Any error from this read will
+	be returned on the NEXT call to this method.
 
 	*/
 	error Write(

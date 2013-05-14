@@ -151,6 +151,7 @@ int cPort::TCPReadDataWaiting( void )
 			, myPort( port )
 			, myFirstReg( -1 )
 			, myError( not_ready )
+			, myWriteError( OK )
 		{
 			myHandle  = myLastHandle++;
 		}
@@ -296,6 +297,12 @@ int cPort::TCPReadDataWaiting( void )
 
 
 			// decode reply
+
+			/* The values are returned as 
+				16 bit integers 
+				in 2's complement and
+				network byte order ( MSB first )  */
+
 			int iv;
 			union  {
 				short s;
@@ -321,17 +328,17 @@ int cPort::TCPReadDataWaiting( void )
 		error cStation::Write( cWriteWaiting& W )
 		{
 			if( ! myPort.IsOpen() ) {
-				myError = port_not_open;
+				myWriteError = port_not_open;
 				return port_not_open;
 			}
 			if( W.getCount() != 1 ) {
-				myError = NYI;
+				myWriteError = NYI;
 				return NYI;
 			}
 
 			unsigned char buf[1000];
 
-			// assemble the modbus read command
+			// assemble the modbus write command
 			int msglen;
 			buf[0] = myAddress;
 			buf[1] = 6;				// single register read command
@@ -359,7 +366,7 @@ int cPort::TCPReadDataWaiting( void )
 			if( !myPort.WaitForData(
 				7,
 				6000 ) ) {
-					myError = timed_out;
+					myWriteError = timed_out;
 					return timed_out;
 			}
 
@@ -371,8 +378,11 @@ int cPort::TCPReadDataWaiting( void )
 
 			if( buf[1] == 6 )
 				return OK;
-			if( buf[1] == 86 )
+			if( buf[1] == 86 ) {
+				myWriteError = device_exception;
 				return device_exception;
+			}
+			myWriteError = device_error;
 			return device_error;
 
 		}
@@ -566,8 +576,8 @@ error cFarmodbus::Write(
 	boost::mutex::scoped_lock lock( myWriteQueueMutex );
 	myWriteQueue.push( cWriteWaiting( station, first_reg, reg_count, value ) );
 
-	// return immediatly.
-	return OK; 
+	// return immediatly, with error return from PREVIOUS poll
+	return myStation[ station ]->getWriteError(); 
 }
 
 error cFarmodbus::Write(
